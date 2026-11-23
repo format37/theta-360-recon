@@ -1,0 +1,11 @@
+numpy
+scipy
+pyyaml
+opencv-python
+matplotlib
+open3d          # 0.19 was used: TSDF mesh, voxel viewer, renders
+pycolmap>=3.12  # 3.13 was used: the rig mapper (rigs are part of the mapper from 3.12 on)
+torch
+gsplat          # 1.4 was used
+transformers    # the segmentation network and the depth prior, from Hugging Face on first use
+lpips           # optional: LPIPS in the splat scores

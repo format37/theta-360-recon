@@ -1,0 +1,8 @@
+# pool, variant "spherical": the same 144 panoramas in OpenMVG with its native spherical camera, no faces and no
+# rig, with the masks of the rig run (people, sky, round the nadir). Sparse model only, as a check of the rig run.
+#   PAIRS=rig scripts/run_openmvg.sh data/pool/spherical.yaml       # the panorama pairs the rig run matched
+#   python3 -I scripts/spherical_report.py data/pool/spherical.yaml data/pool/rig.yaml
+# Results: data/pool/out/spherical/
+
+photos: "photos/*.JPG"
+method: spherical

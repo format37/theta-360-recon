@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+# data: keep only the session YAML files and the five-line summaries
+data/*/*
+!data/*/*.yaml
+!data/*/summary.md
+# logs of the first runs, local notes
+logs/
+reports/

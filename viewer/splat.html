@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>THETA splat</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #111; }
+    #info { position: absolute; top: 10px; left: 10px; color: #eee; font: 13px/1.4 monospace; z-index: 10;
+            background: rgba(0,0,0,.65); padding: 8px 12px; border-radius: 4px; max-width: 46em; }
+  </style>
+</head>
+<body>
+  <div id="info">Loading...</div>
+  <script type="importmap">
+  { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+      "@mkkellogg/gaussian-splats-3d": "https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.6/build/gaussian-splats-3d.module.js"
+  } }
+  </script>
+  <script type="module">
+    // Start with scripts/view.sh (a local web server), then open http://127.0.0.1:8766/viewer/splat.html
+    // ?run=data/pass-0/out/rig picks the run, ?splat=splat_depth another training of it, ?ply=... any file.
+    // The model frame is z-up with the floor (outdoors: the median ground) at z = 0, one unit = one lens height.
+    // Outdoors the sky was learned as a panorama behind the Gaussians (splat/sky.png); this viewer shows the Gaussians only.
+    import * as GaussianSplats3D from '@mkkellogg/gaussian-splats-3d';
+    const q = new URLSearchParams(location.search);
+    const run = q.get('run') || 'data/pass-0/out/rig';
+    const ply = new URL(q.get('ply') || `../${run}/${q.get('splat') || 'splat'}/splat_view.ply`, location.href).href;
+    const info = document.getElementById('info');
+    const hint = 'This page must be opened through a local web server, not as a file. In a terminal run ' +
+                 'scripts/view.sh in the project folder and open http://127.0.0.1:8766/viewer/splat.html';
+    if (location.protocol === 'file:') { info.textContent = hint; throw new Error(hint); }
+    const view = await (await fetch(`../${run}/product/view.json`)).json();     // eye and target, from scripts/export_view.py
+    try {
+      const head = await fetch(ply, { method: 'HEAD' });
+      if (!head.ok) throw new Error(`${ply} not found (HTTP ${head.status}). ${hint}`);
+      const viewer = new GaussianSplats3D.Viewer({
+        cameraUp: [0, 0, 1],
+        initialCameraPosition: view.eye,
+        initialCameraLookAt: view.look,
+        sharedMemoryForWorkers: false,
+        sphericalHarmonicsDegree: 2,
+        antialiased: true
+      });
+      await viewer.addSplatScene(ply, { progressiveLoad: false, showLoadingUI: true, splatAlphaRemovalThreshold: 5 });
+      viewer.start();
+      info.textContent = new URL(ply).pathname + ' | left-drag: rotate, right-drag: pan, wheel: zoom';
+    } catch (e) { info.textContent = 'Error: ' + e.message; console.error(e); }
+  </script>
+</body>
+</html>

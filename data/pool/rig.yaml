@@ -1,0 +1,76 @@
+# pool: RICOH THETA S on a short pole carried by hand, 144 shots, one every 8 s, a walk of 19 min round the
+# sports building with the pool (teal arched roof), its car parks and lawns. Outdoors, clear sky, low sun in the
+# picture; the operator and a companion are in every shot. 23 Nov 2026.
+#   scripts/run.sh data/pool/rig.yaml 2>&1 | tee data/pool/out/rig/run.log
+# Variant "rig": every panorama is cut into pinhole faces that COLMAP registers as one rigid rig
+# with a shared centre. Results: data/pool/out/rig/
+
+photos: "photos/*.JPG"     # stitched equirectangular panoramas, relative to this folder
+method: rig
+scene: outdoor             # ground and facades instead of floor, ceiling and walls; a sky
+
+camera_height_cm:          # centre of the lens above the ground, by tape. Empty = everything stays in lens heights
+checks_cm: {}              # tape numbers to check it, e.g. {"wall A to wall C": 4200}; then scripts/measure.py
+
+faces:
+  fov: 90
+  size: 1600               # px; 1711 would be the panorama's own resolution in the face centre
+  # views: the pass-0 layout (4 round the horizon tilted 10 deg down, 4 tilted 50 deg up)
+
+mask:
+  rover: none              # nothing is bolted to the camera: hand and pole sit round the nadir, under every face
+  semantic: [person, animal, sky]                # the operator and the companion walk with the camera; sky has no geometry
+  seg_model: openmmlab/upernet-convnext-large    # ADE20K, MIT licence
+  seg_size: 768
+  grow_deg: 1.0            # people are grown by this much
+
+sift_features: 8192
+
+matching:
+  window: 8                # each panorama against the next 8
+  retrieval: 8             # and against its 8 most similar panoramas anywhere in the walk: closes the loops
+  min_face_matches: 6      # of the 64 face pairs of two panoramas, those with this many putative matches (and the best 12)
+
+sfm:
+  mapper:                  # any option of pycolmap.IncrementalPipelineOptions (or of its .mapper)
+    ba_global_frames_ratio: 1.3        # global bundle adjustment after every 30% of growth, not 10%
+    ba_global_points_ratio: 1.3
+    ba_global_ignore_redundant_points3D: true
+
+dense:
+  size: 768                # face width for PatchMatch: 3 cm per pixel at 15 m, far finer than the mesh and voxel sizes
+  every: 1                 # every panorama: the shots are 5 lens heights apart (a walk, not stop-and-go); every 3rd would
+                           # leave PatchMatch 15 lens heights of baseline, 60-70 deg of change on a facade 10 away
+  sources: 8
+  max_sky: 0.6             # faces that are more sky than this are left out (most of the upward faces)
+  keep_maps: false         # delete the photometric and normal maps after fusion: 7/8 of the space they take
+  prior_model: depth-anything/Depth-Anything-V2-Metric-Outdoor-Large-hf
+
+mesh:
+  planes: [walls]          # no floor plane (the ground slopes), no ceiling; facades are snapped where PatchMatch has none
+  max_depth: 12            # lens heights: depth farther than this from a camera is not fused (facades are seen from 2-15)
+  reach: 15                # lens heights: nothing farther from the walked path is fused or kept
+  voxel: 0.07              # TSDF voxel, lens heights (0.05 ran out of 46 GB of memory: see mesh.py)
+  max_walls: 20
+
+voxels:
+  size: 0.1                # lens heights
+  min_views: 2             # a voxel needs a depth from this many panoramas (a prior-only view counts half). 3 left 27k of
+                           # 3.2M: shots 5 lens heights apart see most surfaces from one or two panoramas
+  source: filled           # filled = PatchMatch + prior + planes; mvs = PatchMatch only
+  top: 14                  # lens heights: the grid ends here (the building is ~10 tall; the mesh's trees and towers reach 25)
+  bottom: -4               # and starts here (the ground under the shots goes down to -2.7; stray prior depth to -11)
+
+splat:
+  size: 1200
+  steps: 40000
+  cap: 2500000
+  holdout_every: 8         # every 8th panorama is never trained on (all its faces)
+  holdout_tail: 5          # so are the last 5: a test from beyond the trained path
+  sky: env                 # a learned sky (a panorama at infinity) behind the Gaussians, trained on the sky pixels
+  init: dense              # start from the fused PatchMatch cloud too: 92k sparse points are few for a 175 x 145 m walk
+
+crop:                      # the building alone (scripts/crop.py), lens heights in the scene frame; read off product/plan.png
+  x: [-49, 36]
+  y: [-28, 16]
+  z: [-3, 13]

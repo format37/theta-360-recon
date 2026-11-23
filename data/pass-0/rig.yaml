@@ -1,0 +1,48 @@
+# pass-0: RICOH THETA S on the rover, 49 shots, one every 8 s, one short straight line in the
+# hallway corner of the kitchen. 22 Nov 2026.
+#   scripts/run.sh data/pass-0/rig.yaml 2>&1 | tee data/pass-0/out/rig/run.log
+# Variant "rig": every panorama is cut into pinhole faces that COLMAP registers as one rigid rig
+# with a shared centre. Results: data/pass-0/out/rig/
+
+photos: "photos/*.JPG"     # stitched equirectangular panoramas, relative to this folder
+method: rig
+
+camera_height_cm:          # centre of the lens above the floor, by tape. Empty = everything stays in lens heights
+checks_cm: {}              # tape numbers to check it, e.g. {"ceiling height": 270, "wall A to wall B": 101}; then scripts/measure.py
+
+faces:
+  fov: 90
+  size: 1600               # px; 1711 would be the panorama's own resolution in the face centre
+  views:                   # [yaw, pitch] in degrees. yaw 0 = centre of the panorama, pitch up
+    - [45, -10]            # ring around the horizon, tilted down to reach the floor in front of the rover;
+    - [135, -10]           # the stitching seam (yaw +-90) runs along the face borders
+    - [225, -10]
+    - [315, -10]
+    - [0, 50]              # ring towards the ceiling, covers the zenith
+    - [90, 50]
+    - [180, 50]
+    - [270, 50]
+
+mask:
+  rover: auto              # the static bottom of the sphere, found from the whole set
+  grow_deg: 1.0
+  seam_deg: 0              # half-width of a masked strip around the stitching seam; 0 = off (see product/sfm.json)
+
+sift_features: 8192
+
+dense:
+  size: 1024               # face width for PatchMatch
+  every: 3                 # every 3rd panorama: neighbours a few cm apart only add noise
+  sources: 12
+  prior_model: depth-anything/Depth-Anything-V2-Metric-Indoor-Large-hf    # CC-BY-NC-4.0; the -Small- one is Apache-2.0
+
+splat:
+  size: 1200
+  steps: 30000
+  cap: 1500000
+  holdout_every: 6         # every 6th panorama is never trained on (all its faces)
+  holdout_tail: 5          # so are the last 5: a test from beyond the trained path
+
+compare:                   # the phone run of the same kitchen, for product/compare.md
+  model: ~/projects/kitchen-recon/data/ws/sparse_aligned
+  dense_report: ~/projects/kitchen-recon/renders/dense/depth.json

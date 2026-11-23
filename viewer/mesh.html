@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>THETA mesh</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #1b1b1f; }
+    #info { position: absolute; top: 10px; left: 10px; color: #eee; font: 13px/1.4 monospace; z-index: 10;
+            background: rgba(0,0,0,.65); padding: 8px 12px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div id="info">Loading mesh...</div>
+  <script type="importmap">
+  { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  } }
+  </script>
+  <script type="module">
+    // Start with scripts/view.sh (a local web server), then open http://127.0.0.1:8766/viewer/mesh.html
+    // ?run=data/pool/out/rig picks the run, ?mesh=mesh_mvs.ply the PatchMatch-only mesh, ?mesh=voxels_cubes.ply the voxel
+    // model as cubes (lit, so that they read as cubes), ?mesh=voxels.ply the voxel centres as points, ?ply=... any file.
+    // Back faces are culled: from outside you look through the near walls into the room.
+    import * as THREE from 'three';
+    import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    const q = new URLSearchParams(location.search);
+    const run = q.get('run') || 'data/pass-0/out/rig';
+    const ply = new URL(q.get('ply') || `../${run}/product/${q.get('mesh') || 'mesh_view.ply'}`, location.href).href;
+    const info = document.getElementById('info');
+    const hint = 'This page must be opened through a local web server, not as a file. In a terminal run ' +
+                 'scripts/view.sh in the project folder and open http://127.0.0.1:8766/viewer/mesh.html';
+    if (location.protocol === 'file:') { info.textContent = hint; throw new Error(hint); }
+    const view = await (await fetch(`../${run}/product/view.json`)).json();
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(devicePixelRatio);
+    document.body.appendChild(renderer.domElement);
+    const scene = new THREE.Scene(); scene.background = new THREE.Color(0x1b1b1f);
+    THREE.Object3D.DEFAULT_UP.set(0, 0, 1);
+    const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.02, 2000);
+    camera.up.set(0, 0, 1); camera.position.set(...view.mesh_eye);
+    const controls = new OrbitControls(camera, renderer.domElement); controls.target.set(...view.mesh_look);
+    const lit = q.get('lit') || ply.includes('voxels_cubes');
+    if (lit) {                                                     // cubes need light and shade to look like cubes
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.6));
+      const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(-0.4, -0.3, 0.85); scene.add(sun);
+    }
+    new PLYLoader().load(ply, (geo) => {
+      const side = q.get('double') ? THREE.DoubleSide : THREE.FrontSide;
+      const tris = geo.index ? geo.index.count / 3 : 0;
+      if (tris && lit) geo.computeVertexNormals();
+      const obj = !tris ? new THREE.Points(geo, new THREE.PointsMaterial({ vertexColors: true, size: view.lens_height * 0.05 }))   // a point cloud, e.g. voxels.ply
+                : new THREE.Mesh(geo, lit ? new THREE.MeshLambertMaterial({ vertexColors: true, side }) : new THREE.MeshBasicMaterial({ vertexColors: true, side }));
+      scene.add(obj);
+      info.textContent = new URL(ply).pathname + ' | ' + (tris ? tris.toLocaleString() + ' triangles' : geo.attributes.position.count.toLocaleString() + ' points') +
+        ' | z up, lens heights | left-drag: rotate, right-drag: pan, wheel: zoom | ?double=1 shows back faces';
+    }, (p) => { if (p.total) info.textContent = `Loading mesh... ${Math.round(100 * p.loaded / p.total)}%`; },
+       (e) => { info.textContent = 'Error loading ' + ply + '. ' + hint; console.error(e); });
+    addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+    renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+  </script>
+</body>
+</html>
