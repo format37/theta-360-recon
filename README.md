@@ -5,13 +5,26 @@ Gaussian splat with COLMAP, gsplat and Open3D. Two sessions so far: a room seen 
 building walked round outdoors with the camera on a hand-held pole (`pool`).
 
 - Write-up of the outdoor session: [Gaussian Splats from 360 Camera Footage Outdoors](https://latentstate.dev/posts/gaussian-splats-from-360-camera-outdoors/)
+- Example data: [format37/theta-s-pool-walk](https://huggingface.co/datasets/format37/theta-s-pool-walk) on Hugging Face:
+  the 144 panoramas of the pool walk (people painted out, vehicles blurred, no GPS) and our results
 - The layout (one YAML per run, results next to it) follows [fpv-photogrammetry](https://github.com/format37/fpv-photogrammetry),
   the drone project. The lessons about white walls, the voxel model, the progress view and the summary page come from two
   unpublished phone projects that the code comments call `kitchen-recon` and `galaxy-s26-ultra-stereo`.
 
 ![The splat of the pool session from 30 degrees above: a view nobody took a photo from](docs/pool-splat.jpg)
 
-The photos themselves are not in the repository (people, and a GPS position in every file): see [Privacy](#privacy).
+The photos themselves are not in the repository: the pool walk is on Hugging Face, anonymised (see [Privacy](#privacy)).
+
+## Try it on the example data
+
+```bash
+pip install -r requirements.txt
+hf download format37/theta-s-pool-walk --repo-type dataset --local-dir data/pool-walk      # 850 MB
+scripts/run.sh data/pool-walk/rig.yaml 2>&1 | tee data/pool-walk/run.log                 # about 3.5 h on an RTX 4090
+```
+
+`data/pool-walk/reference/out/rig/` holds our run: compare `summary.md` with yours. The photos have people painted black;
+`mask.given: people` in the YAML tells the pipeline where (the networks cannot find people who are not there any more).
 
 ```
 panoramas ─► masks ─► faces of a rigid rig ─► pairs ─► sparse model ─► scene frame ─► PatchMatch ─► prior + planes ─► mesh
@@ -72,6 +85,8 @@ Each takes the same YAML and can be run on its own.
 | the building alone (box `crop:` in the YAML) | `crop.py` | `product/*_building.ply`, `splat*/splat_building.ply` |
 | this run next to the phone run (pass-0) | `compare.py` | `product/compare.md` |
 | every number on one page | `summary.py` | `out/<variant>/summary.md` |
+| a copy of the photos fit to publish: people painted, vehicles blurred, no GPS | `anonymise.py` | `share/<session>/` |
+| a light copy of the splat for a web page (cropped, thinned, `.splat`) | `web_splat.py` | `scene.splat`, `sky.png`, `meta.json` |
 | pictures for a write-up: no captions, nobody in them | `figures.py` | `product/post/` |
 
 Experiments outside the main path: `rig_refine.py` (lets bundle adjustment move the faces inside the rig:
@@ -201,6 +216,8 @@ MIT.
 
 ## Privacy
 
-The THETA writes its GPS position into every JPEG. Strip it before a photo leaves this machine:
-`exiftool -gps:all= file.JPG`. Nothing in this pipeline uploads photos. People in the photos are masked for the
-reconstruction, not blurred in the photos themselves.
+The THETA writes its GPS position into every JPEG (from the phone app). Nothing in this pipeline uploads photos, and the
+reconstruction only masks people; it does not change the photos. To publish a session, `scripts/anonymise.py` writes a
+copy: people painted black (two networks, then a second look with Mask R-CNN on the painted photo), vehicles blurred,
+GPS, maker note and thumbnail dropped, and a contact sheet per 12 shots in `check/` to look through before uploading.
+For a single photo: `exiftool -gps:all= file.JPG`.

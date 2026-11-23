@@ -130,16 +130,22 @@ for i, f in enumerate(p.photos):
     pano = cv2.imread(str(f))
     faces = [sample(pano, mx, my) for mx, my in maps]
     if seg: sky, mov = seg(faces)
+    given = None                                                         # a mask that came with the photo: counts as people
+    if p.mask_given and (p.session / p.mask_given / f'{f.stem}.png').exists():
+        g_ = cv2.imread(str(p.session / p.mask_given / f'{f.stem}.png'), cv2.IMREAD_GRAYSCALE)
+        given = [sample(g_, mx, my, cv2.INTER_NEAREST) > 127 for mx, my in maps]
     km = []
     for v, face in enumerate(faces):
         cv2.imwrite(str(p.faces / f'v{v:02d}' / f'{f.stem}.jpg'), face, [cv2.IMWRITE_JPEG_QUALITY, 95])
         k = fmask[v].copy()
         if seg:
             m = cv2.dilate(mov[v].astype(np.uint8), grow) > 0
+            if given is not None: m |= given[v]
             label = np.where(~fmask[v], 3, np.where(m, 2, np.where(sky[v], 1, 0))).astype(np.uint8)
             cv2.imwrite(str(p.labels / f'v{v:02d}' / f'{f.stem}.png'), label)
             k &= ~m & ~(cv2.dilate(sky[v].astype(np.uint8), sky_edge) > 0)
             stats['sky'][v] += sky[v].mean(); stats['people'][v] += m.mean()
+        if given is not None and not seg: k &= ~given[v]
         stats['kept'][v] += k.mean()
         cv2.imwrite(str(p.masks / f'v{v:02d}' / f'{f.stem}.jpg.png'), k.astype(np.uint8) * 255); km.append(k)
     if seg:

@@ -7,3 +7,6 @@ data/*/*
 # logs of the first runs, local notes
 logs/
 reports/
+# the published copy of a session (scripts/anonymise.py) and its test run
+share/
+data/pool-public/

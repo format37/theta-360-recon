@@ -44,6 +44,7 @@ def load(path):
         # masks: the platform (rover: auto | none | <png in the session>), then classes of a segmentation network per face
         mask_rover=mask.get('rover', 'auto'), mask_grow_deg=float(mask.get('grow_deg', 1.0)),
         mask_seam_deg=float(mask.get('seam_deg', 0)), mask_semantic=list(mask.get('semantic') or []),
+        mask_given=mask.get('given'),          # a folder in the session: <photo stem>.png drawn on the panorama, white = hide (scripts/anonymise.py)
         seg_model=mask.get('seg_model', 'openmmlab/upernet-convnext-large'), seg_size=int(mask.get('seg_size', 768)),
         features=int(cfg.get('sift_features', 8192)),
         # matching: no window = every face against every face of every other panorama (pass-0)
